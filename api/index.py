@@ -83,7 +83,7 @@ class HealthResponse(BaseModel):
 # Endpoints
 # ──────────────────────────────────────────────
 
-@app.get("/health", response_model=HealthResponse)
+@app.get("/api/py/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(
@@ -93,7 +93,7 @@ async def health_check():
     )
 
 
-@app.post("/analyze", response_model=AnalysisResponse)
+@app.post("/api/py/analyze", response_model=AnalysisResponse)
 async def analyze_content(file: UploadFile = File(...)):
     """
     Analyze uploaded digital content for authenticity.
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "main:app",
+        "index:app",
         host=os.getenv("AI_ENGINE_HOST", "0.0.0.0"),
         port=int(os.getenv("AI_ENGINE_PORT", "8000")),
         reload=True,

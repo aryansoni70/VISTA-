@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createVerification, getVerificationByHash } from "@/lib/db";
+import { createVerification } from "@/lib/db";
 import { generateVerificationId } from "@/lib/types";
 import crypto from "crypto";
 import fs from "fs";
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     fs.writeFileSync(tempFilePath, buffer);
 
     // Create DB record
-    const verification = createVerification({
+    createVerification({
       verification_id: verificationId,
       content_hash: contentHash,
       file_name: file.name,

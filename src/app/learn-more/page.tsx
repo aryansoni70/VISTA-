@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unescaped-entities, react/jsx-no-comment-textnodes */
 import Link from "next/link";
 import React from "react";
 

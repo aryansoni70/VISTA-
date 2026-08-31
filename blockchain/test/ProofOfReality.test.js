@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unused-expressions */
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 

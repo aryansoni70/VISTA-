@@ -18,12 +18,7 @@ function VerifyContent() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-verify if ID is in URL
-  useEffect(() => {
-    if (prefillId) {
-      handleVerify(prefillId);
-    }
-  }, [prefillId]);
+
 
   const handleVerify = async (verificationId: string, file?: File) => {
     setIsVerifying(true);
@@ -52,6 +47,15 @@ function VerifyContent() {
       setIsVerifying(false);
     }
   };
+
+  // Auto-verify if ID is in URL
+  // Auto-verify if ID is in URL
+  useEffect(() => {
+    if (prefillId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleVerify(prefillId);
+    }
+  }, [prefillId]);
 
   return (
     <div className="page-enter bg-gray-50 min-h-screen">

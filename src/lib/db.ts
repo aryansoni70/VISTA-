@@ -6,6 +6,7 @@
  */
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { Verification, generateVerificationId } from "./types";
 
 // Database file path
@@ -16,7 +17,6 @@ let db: Database.Database | null = null;
 function getDb(): Database.Database {
   if (!db) {
     // Ensure data directory exists
-    const fs = require("fs");
     const dir = path.dirname(DB_PATH);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });

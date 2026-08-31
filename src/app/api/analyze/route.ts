@@ -6,7 +6,13 @@ import {
 import fs from "fs";
 import path from "path";
 
-const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:8000";
+// Determine the base URL for the internal API call
+const getBaseUrl = () => {
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return `http://localhost:${process.env.PORT || 3000}`;
+};
+
+const AI_ENGINE_URL = process.env.AI_ENGINE_URL || `${getBaseUrl()}/api/py`;
 const UPLOAD_DIR = path.join(process.cwd(), "uploads");
 
 export async function POST(request: NextRequest) {
@@ -199,7 +205,7 @@ function generateFallbackAnalysis(
   }
 
 
-  const metrics: any = {
+  const metrics: Record<string, unknown> = {
     ai_manipulation: {
       score: aiManipulation,
       label: "AI Manipulation Check",

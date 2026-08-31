@@ -23,6 +23,7 @@ export default function RealityScore({
 
   useEffect(() => {
     if (!animate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayScore(score);
       return;
     }

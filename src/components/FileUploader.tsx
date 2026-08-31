@@ -1,14 +1,10 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useCallback, useState } from "react";
 import { formatFileSize } from "@/lib/types";
 
-const ACCEPTED_TYPES = [
-  "video/mp4", "video/quicktime", "video/x-msvideo", "video/webm",
-  "image/jpeg", "image/png", "image/webp", "image/gif", "image/bmp",
-  "audio/mpeg", "audio/wav", "audio/ogg", "audio/flac",
-  "application/pdf",
-];
+
 
 const ACCEPTED_EXTENSIONS = ".mp4,.mov,.avi,.webm,.mkv,.jpg,.jpeg,.png,.webp,.gif,.bmp,.mp3,.wav,.ogg,.flac,.pdf";
 
