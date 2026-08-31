@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 try:
+    # pyrefly: ignore [missing-import]
     from PIL import Image, ExifTags
     HAS_PIL = True
 except ImportError:
