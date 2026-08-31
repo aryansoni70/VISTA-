@@ -1,0 +1,398 @@
+# Proof-of-Reality Network — Implementation Plan
+
+> **Goal**: Build a hackathon MVP that lets users upload digital content (video/image/audio), run AI forensic analysis, generate a Reality Score, store the verification on blockchain, and produce a publicly verifiable authenticity certificate.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Monorepo Structure**: The plan uses a single monorepo with three sub-projects (`frontend/`, `backend/`, `blockchain/`). If you'd prefer separate repos or a different folder structure, let me know.
+
+> [!IMPORTANT]
+> **Blockchain Network**: This plan uses **Polygon Amoy Testnet** (Chain ID: 80002, gas token: POL). You'll need a MetaMask wallet and free testnet POL from [Polygon Faucet](https://faucet.polygon.technology/). Confirm this is acceptable.
+
+> [!WARNING]
+> **AI Models — Simulated for MVP**: Training/running real EfficientNet deepfake models requires GPU and large datasets. For the hackathon demo, the AI engine will use **realistic simulated analysis** (deterministic scoring based on file properties like metadata, hash entropy, file size, and frame extraction) to demonstrate the full pipeline. This is standard practice for hackathon MVPs — judges evaluate the architecture and workflow, not whether you trained a novel ML model from scratch. The architecture is designed so real models (EfficientNet-B0, MTCNN, etc.) can be dropped in later as a plug-in replacement.
+
+> [!IMPORTANT]
+> **Environment Prerequisites**: You'll need Node.js 18+, Python 3.10+, FFmpeg installed and on PATH, and a MetaMask wallet private key for blockchain deployment. Confirm these are available on your machine.
+
+---
+
+## Open Questions
+
+1. **Do you have Python 3.10+ installed?** The AI engine backend runs on FastAPI + Python.
+2. **Do you have FFmpeg installed?** Needed for video/audio frame extraction and metadata analysis.
+3. **Do you have a MetaMask wallet** with a private key ready for Polygon Amoy testnet deployment?
+4. **Preferred database**: The plan uses **SQLite** for the hackathon MVP (zero setup). Would you prefer PostgreSQL or MongoDB instead?
+5. **IPFS**: Do you want to include Pinata/IPFS integration in the MVP, or defer it to "nice-to-have"? The plan currently defers it.
+
+---
+
+## Tech Stack (Final)
+
+| Layer | Technology | Version | Purpose |
+|:---|:---|:---|:---|
+| **Frontend** | Next.js + React | 15.x | Web application (App Router) |
+| **Language** | TypeScript | 5.x | Frontend + Node backend |
+| **UI Framework** | Tailwind CSS | v4 | Modern, responsive interface |
+| **UI Components** | shadcn/ui | latest | Premium component library |
+| **Backend API** | Next.js API Routes | 15.x | Upload handling, blockchain interaction, certificate generation |
+| **AI Engine** | Python + FastAPI | 3.10+ / 0.115+ | Forensic analysis microservice |
+| **Media Processing** | FFmpeg + ffprobe | 7.x | Frame/audio extraction, video metadata |
+| **Image Analysis** | Pillow + python-magic | latest | Image metadata & format validation |
+| **Hashing** | SHA-256 (hashlib) | stdlib | Content fingerprinting |
+| **Blockchain** | Polygon Amoy Testnet | Chain 80002 | Verification records on-chain |
+| **Smart Contracts** | Solidity + Hardhat | 0.8.24 / 2.22+ | Smart contract development & deployment |
+| **Web3** | ethers.js | v6 | Blockchain interaction from frontend/backend |
+| **Database** | SQLite (better-sqlite3) | latest | Verification history (MVP — zero setup) |
+| **Deployment** | Vercel (frontend) + local/cloud (AI engine) | — | Hosting |
+
+### Architecture Diagram
+
+```mermaid
+graph TD
+    A["👤 User"] -->|"Upload File"| B["Next.js Frontend"]
+    B -->|"API Call"| C["Next.js API Routes"]
+    C -->|"Generate"| D["SHA-256 Hash"]
+    C -->|"Send File"| E["Python FastAPI - AI Engine"]
+    E -->|"Process"| F["FFmpeg / Pillow"]
+    F -->|"Extract"| G["Frames + Metadata"]
+    G -->|"Analyze"| H["AI Forensic Modules"]
+    H -->|"Return"| I["Reality Score + Breakdown"]
+    I -->|"Return to"| C
+    C -->|"Store Proof"| J["Polygon Amoy - Smart Contract"]
+    C -->|"Save Record"| K["SQLite Database"]
+    J -->|"Tx Hash"| C
+    C -->|"Generate"| L["Authenticity Certificate"]
+    L -->|"Display"| B
+    
+    M["🌍 Public Verifier"] -->|"Enter Verification ID"| N["Public Verification Page"]
+    N -->|"Query"| C
+    C -->|"Check"| J
+```
+
+---
+
+## Project Directory Structure
+
+```
+helptime/
+├── frontend/                          # Next.js 15 App
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── layout.tsx             # Root layout with fonts + metadata
+│   │   │   ├── page.tsx               # Landing page (hero + features)
+│   │   │   ├── globals.css            # Tailwind + custom styles
+│   │   │   ├── upload/
+│   │   │   │   └── page.tsx           # File upload interface
+│   │   │   ├── analysis/
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx       # Analysis progress + results
+│   │   │   ├── certificate/
+│   │   │   │   └── [id]/
+│   │   │   │       └── page.tsx       # Authenticity certificate view
+│   │   │   ├── verify/
+│   │   │   │   └── page.tsx           # Public verification page
+│   │   │   ├── history/
+│   │   │   │   └── page.tsx           # Verification history dashboard
+│   │   │   └── api/
+│   │   │       ├── upload/
+│   │   │       │   └── route.ts       # File upload + hash generation
+│   │   │       ├── analyze/
+│   │   │       │   └── route.ts       # Proxy to Python AI engine
+│   │   │       ├── blockchain/
+│   │   │       │   └── route.ts       # Smart contract interaction
+│   │   │       ├── verify/
+│   │   │       │   └── route.ts       # Public verification lookup
+│   │   │       └── certificate/
+│   │   │           └── route.ts       # Certificate data retrieval
+│   │   ├── components/
+│   │   │   ├── ui/                    # shadcn/ui components
+│   │   │   ├── Navbar.tsx             # Navigation bar
+│   │   │   ├── FileUploader.tsx       # Drag & drop upload component
+│   │   │   ├── AnalysisProgress.tsx   # Analysis progress visualization
+│   │   │   ├── RealityScore.tsx       # Animated score display
+│   │   │   ├── ScoreBreakdown.tsx     # Individual metric cards
+│   │   │   ├── Certificate.tsx        # Certificate display component
+│   │   │   ├── BlockchainProof.tsx    # Blockchain verification display
+│   │   │   ├── VerificationForm.tsx   # Public verification input
+│   │   │   └── Footer.tsx            # Footer component
+│   │   └── lib/
+│   │       ├── blockchain.ts          # ethers.js + contract interaction
+│   │       ├── hash.ts               # SHA-256 hashing utilities
+│   │       ├── db.ts                  # SQLite database utilities
+│   │       └── types.ts              # TypeScript interfaces
+│   ├── public/                        # Static assets
+│   ├── package.json
+│   ├── next.config.ts
+│   └── tsconfig.json
+│
+├── ai-engine/                         # Python FastAPI Microservice
+│   ├── main.py                        # FastAPI app + routes
+│   ├── analyzers/
+│   │   ├── __init__.py
+│   │   ├── video_analyzer.py          # Video forensic analysis
+│   │   ├── image_analyzer.py          # Image forensic analysis
+│   │   ├── audio_analyzer.py          # Audio forensic analysis
+│   │   ├── metadata_analyzer.py       # Metadata consistency analysis
+│   │   └── score_engine.py            # Reality Score computation
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── media_processor.py         # FFmpeg frame/audio extraction
+│   │   └── hash_utils.py             # SHA-256 hashing
+│   ├── requirements.txt
+│   └── .env
+│
+├── blockchain/                        # Hardhat Smart Contract Project
+│   ├── contracts/
+│   │   └── ProofOfReality.sol         # Verification smart contract
+│   ├── scripts/
+│   │   └── deploy.js                  # Deployment script
+│   ├── test/
+│   │   └── ProofOfReality.test.js     # Contract tests
+│   ├── hardhat.config.js
+│   ├── package.json
+│   └── .env
+│
+├── .env.example                       # Environment variable template
+└── README.md                          # Project documentation
+```
+
+---
+
+## Proposed Changes
+
+### Phase 1 — Blockchain Smart Contract
+
+> Build the foundation first — the immutable verification layer.
+
+#### [NEW] `blockchain/contracts/ProofOfReality.sol`
+Solidity smart contract with:
+- `registerVerification(verificationId, contentHash, realityScore, verdict, timestamp)` — stores verification on-chain
+- `getVerification(verificationId)` — retrieves verification record
+- `verifyContentHash(verificationId, contentHash)` — checks if a given hash matches the stored hash
+- Events: `VerificationRegistered` emitted on each new registration
+- Owner-controlled access (only the backend can register)
+
+#### [NEW] `blockchain/hardhat.config.js`
+Hardhat configuration targeting Polygon Amoy testnet (Chain ID 80002), with etherscan verification support.
+
+#### [NEW] `blockchain/scripts/deploy.js`
+Deployment script using Hardhat Ignition or classic deployment pattern.
+
+#### [NEW] `blockchain/test/ProofOfReality.test.js`
+Unit tests for the smart contract — register, retrieve, and verify.
+
+---
+
+### Phase 2 — Python AI Forensic Engine
+
+> The analysis microservice that processes uploaded content.
+
+#### [NEW] `ai-engine/main.py`
+FastAPI application with:
+- `POST /analyze` — accepts file upload, runs all analyzers, returns Reality Score
+- `GET /health` — health check endpoint
+- CORS configured for Next.js frontend
+
+#### [NEW] `ai-engine/analyzers/video_analyzer.py`
+Video analysis module:
+- Frame extraction via FFmpeg
+- Frame-to-frame consistency analysis
+- Face region detection and anomaly scoring
+- Temporal consistency checks
+
+#### [NEW] `ai-engine/analyzers/image_analyzer.py`
+Image analysis module:
+- Format validation and magic byte checking
+- EXIF metadata extraction
+- Compression artifact analysis
+- AI generation pattern detection (based on statistical features)
+
+#### [NEW] `ai-engine/analyzers/audio_analyzer.py`
+Audio analysis module:
+- Audio stream extraction from video
+- Spectral analysis for synthetic voice markers
+- Bitrate and encoding consistency
+
+#### [NEW] `ai-engine/analyzers/metadata_analyzer.py`
+Metadata analysis module:
+- Timestamp consistency (creation vs modification)
+- Device/software information extraction
+- Edit history detection
+- GPS/location data extraction
+
+#### [NEW] `ai-engine/analyzers/score_engine.py`
+Reality Score computation:
+- Weighted combination of all analyzer outputs
+- Configurable weights per analysis category
+- Verdict classification (High Confidence → Highly Likely Manipulated)
+- Confidence breakdown per metric
+
+#### [NEW] `ai-engine/utils/media_processor.py`
+FFmpeg wrapper utilities for frame extraction, audio extraction, and probe metadata.
+
+---
+
+### Phase 3 — Next.js Frontend + API Routes
+
+> The complete user-facing application.
+
+#### [NEW] `frontend/` — Next.js 15 project
+Initialize with: `npx -y create-next-app@latest ./ --typescript --tailwind --eslint --app --src-dir --no-import-alias`
+
+#### [NEW] `frontend/src/app/page.tsx` — Landing Page
+Hero section with:
+- Animated gradient background
+- Problem statement + solution explanation
+- "Verify Content Now" CTA button
+- Feature cards (AI Detection, Blockchain Proof, Public Verification)
+- How-it-works flow diagram
+- Statistics/trust indicators
+
+#### [NEW] `frontend/src/app/upload/page.tsx` — Upload Interface
+- Drag-and-drop file upload zone
+- Supported formats display (MP4, MOV, AVI, JPG, PNG, WAV, MP3, PDF)
+- File preview (thumbnail for images, first frame for videos)
+- Upload progress with animated indicator
+- File size and type validation
+
+#### [NEW] `frontend/src/app/analysis/[id]/page.tsx` — Analysis Dashboard
+- Real-time analysis progress (step-by-step with animations)
+- Reality Score display (animated circular gauge)
+- Breakdown cards: Source Authenticity, Device Authenticity, Temporal Consistency, Metadata Integrity, AI Manipulation
+- SHA-256 hash display
+- Blockchain registration status
+- "View Certificate" CTA
+
+#### [NEW] `frontend/src/app/certificate/[id]/page.tsx` — Certificate Page
+- Official-looking certificate with:
+  - Verification ID (POR-YYYY-XXXXX format)
+  - Reality Score with verdict badge
+  - Blockchain transaction hash (linked to Polygonscan)
+  - Content hash
+  - Timestamp
+  - QR code for public verification URL
+- Download/share options
+
+#### [NEW] `frontend/src/app/verify/page.tsx` — Public Verification
+- Input field for Verification ID
+- Optional file re-upload for hash comparison
+- Display: stored hash, timestamp, score, verdict, blockchain tx
+- Hash match/mismatch indicator with visual feedback
+- "Content matches ✓" or "Content modified ⚠" result
+
+#### [NEW] `frontend/src/app/history/page.tsx` — Verification History
+- Table/grid of past verifications
+- Filters by verdict, date, file type
+- Click to view certificate
+
+#### [NEW] API Routes
+- `POST /api/upload` — Handle file upload, generate SHA-256 hash, save to disk, create DB record
+- `POST /api/analyze` — Forward file to Python AI engine, store results
+- `POST /api/blockchain` — Register verification on smart contract via ethers.js
+- `GET /api/verify/[id]` — Look up verification by ID, query blockchain
+- `GET /api/certificate/[id]` — Retrieve certificate data
+
+#### [NEW] Core Components
+- `FileUploader.tsx` — Drag-and-drop with preview, glassmorphism design
+- `RealityScore.tsx` — Animated circular gauge with color gradient (red → green)
+- `ScoreBreakdown.tsx` — Individual metric cards with progress bars
+- `Certificate.tsx` — Certificate layout with holographic/gradient border
+- `BlockchainProof.tsx` — Transaction details with Polygonscan link
+- `VerificationForm.tsx` — ID input + optional file upload for hash comparison
+- `Navbar.tsx` — Navigation with logo and links
+- `AnalysisProgress.tsx` — Step-by-step progress with checkmarks
+
+#### [NEW] `frontend/src/lib/blockchain.ts`
+ethers.js v6 integration:
+- Contract ABI import
+- Provider + signer setup for Polygon Amoy
+- `registerVerification()` wrapper
+- `getVerification()` wrapper
+- `verifyHash()` wrapper
+
+#### [NEW] `frontend/src/lib/db.ts`
+SQLite database layer using `better-sqlite3`:
+- `verifications` table: id, verification_id, content_hash, file_name, file_type, reality_score, verdict, analysis_results (JSON), blockchain_tx_hash, created_at
+- CRUD operations
+
+---
+
+## Implementation Order
+
+```mermaid
+gantt
+    title Proof-of-Reality MVP Build Order
+    dateFormat  X
+    axisFormat %s
+
+    section Phase 1 - Blockchain
+    Smart Contract (Solidity)           :a1, 0, 1
+    Hardhat Config + Deploy Script      :a2, 1, 2
+    Contract Tests                      :a3, 2, 3
+    Deploy to Amoy Testnet              :a4, 3, 4
+
+    section Phase 2 - AI Engine
+    FastAPI Setup + Routes              :b1, 4, 5
+    Media Processor (FFmpeg)            :b2, 5, 6
+    Analyzers (Video/Image/Audio/Meta)  :b3, 6, 8
+    Score Engine                        :b4, 8, 9
+
+    section Phase 3 - Frontend
+    Next.js Init + Design System        :c1, 9, 10
+    Landing Page                        :c2, 10, 11
+    Upload Page                         :c3, 11, 12
+    Analysis Dashboard                  :c4, 12, 14
+    Certificate Page                    :c5, 14, 15
+    Public Verification Page            :c6, 15, 16
+    History Page                        :c7, 16, 17
+
+    section Phase 4 - Integration
+    API Routes (Upload/Analyze/Chain)   :d1, 17, 19
+    End-to-End Pipeline                 :d2, 19, 20
+    Polish + Testing                    :d3, 20, 21
+```
+
+**Execution sequence**: Blockchain → AI Engine → Frontend → Integration → Polish
+
+---
+
+## Verification Plan
+
+### Automated Tests
+```bash
+# Smart contract tests
+cd blockchain && npx hardhat test
+
+# AI engine (manual test via curl)
+cd ai-engine && python -m pytest tests/ -v
+
+# Frontend build validation
+cd frontend && npm run build
+```
+
+### Manual Verification
+1. **Upload Flow**: Upload a sample image/video → verify AI analysis runs → score displays correctly
+2. **Blockchain**: Confirm transaction appears on [Amoy Polygonscan](https://amoy.polygonscan.com/)
+3. **Certificate**: Verify certificate generates with correct data and QR code
+4. **Public Verification**: Enter Verification ID → confirm stored data matches → re-upload same file → confirm hash matches → upload different file → confirm hash mismatch warning
+5. **End-to-End**: Complete user journey from upload → certificate → public verification
+
+---
+
+## Design Direction
+
+The UI will feature a **dark theme with cyberpunk/trust aesthetics**:
+- Deep navy/dark background (`#0a0f1e`)
+- Neon accent gradients (cyan `#00d4ff` → purple `#7b2ff7`)
+- Glassmorphism cards with `backdrop-blur`
+- Animated score gauges with SVG
+- Holographic certificate borders
+- Smooth page transitions with Framer Motion
+- Inter/Outfit font from Google Fonts
+- Micro-animations on hover and state changes
+
+This creates a premium, "trust infrastructure" feel appropriate for a security/verification product.

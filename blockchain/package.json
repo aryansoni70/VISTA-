@@ -1,0 +1,16 @@
+{
+  "name": "proof-of-reality-contracts",
+  "version": "1.0.0",
+  "description": "Proof-of-Reality Network smart contracts",
+  "scripts": {
+    "compile": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:amoy": "npx hardhat run scripts/deploy.js --network amoy",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.0"
+  }
+}
