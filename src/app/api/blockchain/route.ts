@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
       const tx = await contract.registerVerification(
         verification.verification_id,
         verification.content_hash,
-        Math.round(verification.reality_score),
-        verification.verdict
+        Math.round(verification.reality_score || 0),
+        verification.verdict || "UNKNOWN"
       );
 
       const receipt = await tx.wait();

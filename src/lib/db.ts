@@ -5,12 +5,13 @@ export interface VerificationRecord {
   file_type: string;
   file_size: number;
   content_hash: string;
-  status: string;
-  reality_score: number | null;
-  verdict: string | null;
-  verdict_label: string | null;
-  analysis_results: string | null;
-  blockchain_tx: string | null;
+  status?: string;
+  reality_score?: number | null;
+  verdict?: string | null;
+  verdict_label?: string | null;
+  analysis_results?: string | null;
+  blockchain_tx_hash?: string | null;
+  blockchain_status?: string | null;
   created_at?: string;
 }
 
@@ -20,6 +21,13 @@ const db = new Map<string, VerificationRecord>();
 export function createVerification(data: VerificationRecord) {
   const record = {
     ...data,
+    status: data.status || "pending",
+    reality_score: data.reality_score || null,
+    verdict: data.verdict || null,
+    verdict_label: data.verdict_label || null,
+    analysis_results: data.analysis_results || null,
+    blockchain_tx_hash: data.blockchain_tx_hash || null,
+    blockchain_status: data.blockchain_status || null,
     created_at: new Date().toISOString()
   };
   db.set(data.verification_id, record);
@@ -37,15 +45,16 @@ export function updateVerificationAnalysis(verificationId: string, data: Partial
   }
 }
 
-export function updateVerificationBlockchain(verificationId: string, txHash: string) {
+export function updateBlockchainStatus(verificationId: string, txHash: string, status: string) {
   const record = db.get(verificationId);
   if (record) {
-    db.set(verificationId, { ...record, blockchain_tx: txHash, status: "completed" });
+    db.set(verificationId, { ...record, blockchain_tx_hash: txHash, blockchain_status: status });
   }
 }
 
-export function getAllVerifications(): VerificationRecord[] {
-  return Array.from(db.values()).sort((a, b) => {
+export function getAllVerifications(limit: number = 50): VerificationRecord[] {
+  const all = Array.from(db.values()).sort((a, b) => {
     return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
   });
+  return all.slice(0, limit);
 }
