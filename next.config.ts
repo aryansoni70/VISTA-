@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // Increase the body parser limit for file uploads
   experimental: {
     serverActions: {
-      bodySizeLimit: "500mb",
+      bodySizeLimit: "1000mb",
     },
   },
   async rewrites() {

@@ -135,7 +135,7 @@ export default function FileUploader({ onFileSelected, isUploading = false }: Fi
                 <span className="text-[#0F7642] underline underline-offset-2">browse</span>
               </p>
               <p className="text-sm text-gray-500 font-medium mt-2">
-                Video, Image, Audio, or PDF — up to 500MB
+                Video, Image, Audio, or PDF — up to 1GB
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2 mt-2">
