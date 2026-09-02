@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get verification record
-    const verification = getVerificationByVerificationId(verification_id);
+    const verification = await getVerificationByVerificationId(verification_id);
     if (!verification) {
       return NextResponse.json(
         { error: "Verification not found" },
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
         verification.content_hash.slice(0, 32)
       ).toString("hex")}${"0".repeat(64 - verification.content_hash.slice(0, 32).length * 2)}`;
 
-      updateBlockchainStatus(verification_id, simulatedTxHash, "confirmed");
+      await updateBlockchainStatus(verification_id, simulatedTxHash, "confirmed");
 
       return NextResponse.json({
         success: true,
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
 
       const receipt = await tx.wait();
 
-      updateBlockchainStatus(
+      await updateBlockchainStatus(
         verification_id,
         receipt.hash,
         "confirmed"
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
       const errorMessage = blockchainError instanceof Error ? blockchainError.message : "Unknown error";
       console.error("Blockchain error:", errorMessage);
 
-      updateBlockchainStatus(verification_id, "", "failed");
+      await updateBlockchainStatus(verification_id, "", "failed");
 
       return NextResponse.json({
         success: false,

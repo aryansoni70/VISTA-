@@ -1,15 +1,24 @@
 """
 Proof-of-Reality AI Forensic Engine
 FastAPI microservice for digital content forensic analysis.
+
+Route prefix note:
+  Routes are defined as /py/* (NOT /api/py/*).
+  When deployed behind Vercel or a reverse proxy, the platform
+  adds the /api/ prefix, so the final URLs become /api/py/*.
 """
 import os
 import uuid
 import shutil
+import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+# pyrefly: ignore [missing-import]
+import httpx
 
 from analyzers.video_analyzer import VideoAnalyzer
 from analyzers.image_analyzer import ImageAnalyzer
@@ -36,9 +45,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./uploads"))
+# Use /tmp for temporary file storage (works in serverless + Railway/Render)
+UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", tempfile.gettempdir())) / "por_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE_MB", "1000")) * 1024 * 1024
+MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE_MB", "50")) * 1024 * 1024
 
 # File type categories
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".flv"}
@@ -82,7 +92,7 @@ class HealthResponse(BaseModel):
 # Endpoints
 # ──────────────────────────────────────────────
 
-@app.get("/api/py/health", response_model=HealthResponse)
+@app.get("/py/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(
@@ -92,7 +102,7 @@ async def health_check():
     )
 
 
-@app.post("/api/py/analyze", response_model=AnalysisResponse)
+@app.post("/py/analyze", response_model=AnalysisResponse)
 async def analyze_content(file: UploadFile = File(...)):
     """
     Analyze uploaded digital content for authenticity.
@@ -189,6 +199,115 @@ async def analyze_content(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
     finally:
         # Clean up temp file
+        if temp_path.exists():
+            temp_path.unlink()
+
+
+# ──────────────────────────────────────────────
+# URL-based analysis (for Vercel Blob integration)
+# ──────────────────────────────────────────────
+
+class AnalyzeUrlRequest(BaseModel):
+    file_url: str
+    file_name: str
+
+
+@app.post("/py/analyze-url", response_model=AnalysisResponse)
+async def analyze_content_from_url(body: AnalyzeUrlRequest):
+    """
+    Analyze content from a URL (e.g. Vercel Blob URL).
+    Downloads the file, runs forensic analysis, and returns results.
+    """
+    analysis_id = str(uuid.uuid4())[:8]
+    file_ext = Path(body.file_name).suffix.lower()
+
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file_ext}. Supported: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    temp_path = UPLOAD_DIR / f"{analysis_id}_{body.file_name}"
+
+    try:
+        # Download file from URL
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(body.file_url)
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to download file from URL: HTTP {response.status_code}",
+                )
+            with open(temp_path, "wb") as f:
+                f.write(response.content)
+
+        file_size = temp_path.stat().st_size
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size: {MAX_FILE_SIZE // (1024*1024)}MB",
+            )
+
+        # Generate SHA-256 hash
+        content_hash = generate_sha256(temp_path)
+
+        # Determine file category
+        if file_ext in VIDEO_EXTENSIONS:
+            file_type = "video"
+        elif file_ext in IMAGE_EXTENSIONS:
+            file_type = "image"
+        elif file_ext in AUDIO_EXTENSIONS:
+            file_type = "audio"
+        else:
+            file_type = "document"
+
+        # Run forensic analysis (same logic as direct upload)
+        analysis_results = {}
+
+        metadata_analyzer = MetadataAnalyzer()
+        metadata_result = metadata_analyzer.analyze(str(temp_path), file_type)
+        analysis_results["metadata"] = metadata_result
+
+        if file_type == "video":
+            video_analyzer = VideoAnalyzer()
+            video_result = video_analyzer.analyze(str(temp_path))
+            analysis_results["video"] = video_result
+            audio_analyzer = AudioAnalyzer()
+            audio_result = audio_analyzer.analyze(str(temp_path))
+            analysis_results["audio"] = audio_result
+        elif file_type == "image":
+            image_analyzer = ImageAnalyzer()
+            image_result = image_analyzer.analyze(str(temp_path))
+            analysis_results["image"] = image_result
+        elif file_type == "audio":
+            audio_analyzer = AudioAnalyzer()
+            audio_result = audio_analyzer.analyze(str(temp_path))
+            analysis_results["audio"] = audio_result
+
+        score_engine = ScoreEngine()
+        reality_score, verdict, verdict_label, metrics = score_engine.calculate(
+            analysis_results, file_type
+        )
+
+        return AnalysisResponse(
+            success=True,
+            file_name=body.file_name,
+            file_type=file_type,
+            file_size=file_size,
+            content_hash=content_hash,
+            reality_score=reality_score,
+            verdict=verdict,
+            verdict_label=verdict_label,
+            metrics=metrics,
+            analysis_details=analysis_results,
+            analysis_id=analysis_id,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    finally:
         if temp_path.exists():
             temp_path.unlink()
 

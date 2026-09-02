@@ -15,7 +15,7 @@ export async function GET(
       );
     }
 
-    const verification = getVerificationByVerificationId(id);
+    const verification = await getVerificationByVerificationId(id);
 
     if (!verification) {
       return NextResponse.json(

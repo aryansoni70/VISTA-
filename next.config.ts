@@ -1,22 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Exclude better-sqlite3 from client-side bundling
-  serverExternalPackages: ["better-sqlite3"],
-  // Increase the body parser limit for file uploads
-  experimental: {
-    serverActions: {
-      bodySizeLimit: "1000mb",
-    },
-  },
+  // Proxy /api/py/* requests to the Python AI engine
   async rewrites() {
+    const aiEngineUrl =
+      process.env.AI_ENGINE_URL || "http://127.0.0.1:8000";
+
     return [
       {
         source: "/api/py/:path*",
-        destination:
-          process.env.NODE_ENV === "development"
-            ? "http://127.0.0.1:8000/api/py/:path*"
-            : "/api/",
+        destination: `${aiEngineUrl}/py/:path*`,
       },
     ];
   },

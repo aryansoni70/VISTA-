@@ -1,3 +1,30 @@
+/**
+ * Database Layer — Supabase PostgreSQL
+ * Replaces the previous in-memory Map() store that lost data
+ * between Vercel serverless invocations.
+ */
+
+import { createClient } from "@supabase/supabase-js";
+
+// ──────────────────────────────────────────────
+// Supabase Client
+// ──────────────────────────────────────────────
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.warn(
+    "⚠️  SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Database operations will fail."
+  );
+}
+
+const supabase = createClient(supabaseUrl || "", supabaseKey || "");
+
+// ──────────────────────────────────────────────
+// Types
+// ──────────────────────────────────────────────
+
 export interface VerificationRecord {
   id?: number;
   verification_id: string;
@@ -5,6 +32,7 @@ export interface VerificationRecord {
   file_type: string;
   file_size: number;
   content_hash: string;
+  file_url?: string | null;
   status?: string;
   reality_score?: number | null;
   verdict?: string | null;
@@ -15,46 +43,115 @@ export interface VerificationRecord {
   created_at?: string;
 }
 
-// Global in-memory store for Vercel Serverless environment
-const db = new Map<string, VerificationRecord>();
+// ──────────────────────────────────────────────
+// CRUD Operations
+// ──────────────────────────────────────────────
 
-export function createVerification(data: VerificationRecord) {
-  const record = {
-    ...data,
-    status: data.status || "pending",
-    reality_score: data.reality_score || null,
-    verdict: data.verdict || null,
-    verdict_label: data.verdict_label || null,
-    analysis_results: data.analysis_results || null,
-    blockchain_tx_hash: data.blockchain_tx_hash || null,
-    blockchain_status: data.blockchain_status || null,
-    created_at: new Date().toISOString()
-  };
-  db.set(data.verification_id, record);
-  return { lastInsertRowid: data.verification_id };
+export async function createVerification(
+  data: Omit<VerificationRecord, "id" | "created_at"> & { file_url?: string }
+) {
+  const { data: result, error } = await supabase
+    .from("verifications")
+    .insert({
+      verification_id: data.verification_id,
+      file_name: data.file_name,
+      file_type: data.file_type,
+      file_size: data.file_size,
+      content_hash: data.content_hash,
+      file_url: data.file_url || null,
+      status: data.status || "pending",
+      reality_score: data.reality_score || null,
+      verdict: data.verdict || null,
+      verdict_label: data.verdict_label || null,
+      analysis_results: data.analysis_results || null,
+      blockchain_tx_hash: data.blockchain_tx_hash || null,
+      blockchain_status: data.blockchain_status || "pending",
+    })
+    .select("verification_id")
+    .single();
+
+  if (error) {
+    console.error("DB createVerification error:", error);
+    throw new Error(`Database insert failed: ${error.message}`);
+  }
+
+  return { lastInsertRowid: result?.verification_id };
 }
 
-export function getVerificationByVerificationId(verificationId: string): VerificationRecord | undefined {
-  return db.get(verificationId);
+export async function getVerificationByVerificationId(
+  verificationId: string
+): Promise<VerificationRecord | null> {
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("*")
+    .eq("verification_id", verificationId)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") {
+      // No rows found
+      return null;
+    }
+    console.error("DB getVerification error:", error);
+    return null;
+  }
+
+  return data as VerificationRecord;
 }
 
-export function updateVerificationAnalysis(verificationId: string, data: Partial<VerificationRecord>) {
-  const record = db.get(verificationId);
-  if (record) {
-    db.set(verificationId, { ...record, ...data });
+export async function updateVerificationAnalysis(
+  verificationId: string,
+  updates: Partial<VerificationRecord>
+) {
+  const { error } = await supabase
+    .from("verifications")
+    .update({
+      reality_score: updates.reality_score,
+      verdict: updates.verdict,
+      verdict_label: updates.verdict_label,
+      analysis_results: updates.analysis_results,
+      status: "completed",
+    })
+    .eq("verification_id", verificationId);
+
+  if (error) {
+    console.error("DB updateVerificationAnalysis error:", error);
+    throw new Error(`Database update failed: ${error.message}`);
   }
 }
 
-export function updateBlockchainStatus(verificationId: string, txHash: string, status: string) {
-  const record = db.get(verificationId);
-  if (record) {
-    db.set(verificationId, { ...record, blockchain_tx_hash: txHash, blockchain_status: status });
+export async function updateBlockchainStatus(
+  verificationId: string,
+  txHash: string,
+  status: string
+) {
+  const { error } = await supabase
+    .from("verifications")
+    .update({
+      blockchain_tx_hash: txHash,
+      blockchain_status: status,
+    })
+    .eq("verification_id", verificationId);
+
+  if (error) {
+    console.error("DB updateBlockchainStatus error:", error);
+    throw new Error(`Database update failed: ${error.message}`);
   }
 }
 
-export function getAllVerifications(limit: number = 50): VerificationRecord[] {
-  const all = Array.from(db.values()).sort((a, b) => {
-    return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-  });
-  return all.slice(0, limit);
+export async function getAllVerifications(
+  limit: number = 50
+): Promise<VerificationRecord[]> {
+  const { data, error } = await supabase
+    .from("verifications")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error("DB getAllVerifications error:", error);
+    return [];
+  }
+
+  return (data as VerificationRecord[]) || [];
 }

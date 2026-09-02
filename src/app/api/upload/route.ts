@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createVerification } from "@/lib/db";
 import { generateVerificationId } from "@/lib/types";
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+import { put } from "@vercel/blob";
 
-// Upload directory
-const UPLOAD_DIR = path.join(process.cwd(), "uploads");
+// Max file size: 50MB (Vercel Blob supports up to 500MB but we keep it reasonable)
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,17 +19,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file size (1000MB max)
-    if (file.size > 1000 * 1024 * 1024) {
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: "File too large. Maximum size: 1000MB" },
+        { error: "File too large. Maximum size: 50MB" },
         { status: 413 }
       );
-    }
-
-    // Create uploads directory
-    if (!fs.existsSync(UPLOAD_DIR)) {
-      fs.mkdirSync(UPLOAD_DIR, { recursive: true });
     }
 
     // Read file buffer
@@ -42,10 +36,10 @@ export async function POST(request: NextRequest) {
     const contentHash = hash.digest("hex");
 
     // Determine file type
-    const ext = path.extname(file.name).toLowerCase();
-    const videoExts = [".mp4", ".mov", ".avi", ".mkv", ".webm"];
-    const imageExts = [".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif"];
-    const audioExts = [".mp3", ".wav", ".ogg", ".flac", ".m4a"];
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const videoExts = ["mp4", "mov", "avi", "mkv", "webm"];
+    const imageExts = ["jpg", "jpeg", "png", "bmp", "webp", "gif"];
+    const audioExts = ["mp3", "wav", "ogg", "flac", "m4a"];
 
     let fileType = "document";
     if (videoExts.includes(ext)) fileType = "video";
@@ -55,17 +49,20 @@ export async function POST(request: NextRequest) {
     // Generate verification ID
     const verificationId = generateVerificationId();
 
-    // Save file temporarily for AI analysis
-    const tempFilePath = path.join(UPLOAD_DIR, `${verificationId}_${file.name}`);
-    fs.writeFileSync(tempFilePath, buffer);
+    // Upload to Vercel Blob (persistent cloud storage)
+    const blob = await put(`uploads/${verificationId}_${file.name}`, buffer, {
+      access: "public",
+      contentType: file.type || "application/octet-stream",
+    });
 
-    // Create DB record
-    createVerification({
+    // Create DB record with blob URL
+    await createVerification({
       verification_id: verificationId,
       content_hash: contentHash,
       file_name: file.name,
       file_type: fileType,
       file_size: file.size,
+      file_url: blob.url,
     });
 
     return NextResponse.json({
@@ -75,7 +72,7 @@ export async function POST(request: NextRequest) {
       file_name: file.name,
       file_type: fileType,
       file_size: file.size,
-      temp_file_path: tempFilePath,
+      file_url: blob.url,
     });
   } catch (error) {
     console.error("Upload error:", error);

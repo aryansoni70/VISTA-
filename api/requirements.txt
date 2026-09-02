@@ -5,3 +5,4 @@ Pillow==11.1.0
 python-magic-bin==0.4.14
 aiofiles==24.1.0
 pydantic==2.10.4
+httpx==0.28.1

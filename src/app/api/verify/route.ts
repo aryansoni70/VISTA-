@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
     // List all verifications
     if (list === "true") {
-      const verifications = getAllVerifications(50);
+      const verifications = await getAllVerifications(50);
       return NextResponse.json({
         success: true,
         verifications,
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const verification = getVerificationByVerificationId(id);
+    const verification = await getVerificationByVerificationId(id);
 
     if (!verification) {
       return NextResponse.json({
