@@ -1,4 +1,4 @@
 # Ignore non-Next.js directories
 blockchain/
-api/__pycache__/
+api/
 data/
