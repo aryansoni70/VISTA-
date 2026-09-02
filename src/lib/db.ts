@@ -2,6 +2,10 @@
  * Database Layer — Supabase PostgreSQL
  * Replaces the previous in-memory Map() store that lost data
  * between Vercel serverless invocations.
+ *
+ * Uses NEXT_PUBLIC_SUPABASE_URL + NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+ * with RLS policies that allow full access via the service role or
+ * the "Allow all operations" policy set in supabase-schema.sql.
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -10,12 +14,12 @@ import { createClient } from "@supabase/supabase-js";
 // Supabase Client
 // ──────────────────────────────────────────────
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.warn(
-    "⚠️  SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set. Database operations will fail."
+    "⚠️  NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY not set. Database operations will fail."
   );
 }
 
